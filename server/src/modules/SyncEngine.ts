@@ -9,6 +9,7 @@ import { FileWatcher, FileChangeEvent, fileWatcher } from './FileWatcher';
 import { syncStateManager } from './SyncStateManager';
 import { FileSyncer } from './FileSyncer';
 import { StateRecovery } from './StateRecovery';
+import { eventLogManager } from './EventLogManager';
 
 export class SyncEngine extends EventEmitter {
   private isRunning = false;
@@ -36,6 +37,8 @@ export class SyncEngine extends EventEmitter {
 
     await this.initialSync();
 
+    eventLogManager.recordSystemStart();
+
     console.log('[SyncEngine] Started');
     this.emit('statusChange', await this.getStatus());
   }
@@ -50,6 +53,8 @@ export class SyncEngine extends EventEmitter {
 
     await fileWatcher.stop();
     fileWatcher.removeAllListeners('change');
+
+    eventLogManager.recordSystemStop();
 
     console.log('[SyncEngine] Stopped');
     this.emit('statusChange', await this.getStatus());
@@ -197,6 +202,8 @@ export class SyncEngine extends EventEmitter {
     const changes = [...this.pendingChanges];
     this.pendingChanges = [];
 
+    eventLogManager.recordSyncCycleStart(changes.length);
+
     console.log(`[SyncEngine] Processing ${changes.length} changes...`);
 
     const config = await getConfig();
@@ -209,6 +216,7 @@ export class SyncEngine extends EventEmitter {
       addOrUpdate: FileState[];
       delete: string[];
     } = { addOrUpdate: [], delete: [] };
+    let totalNewConflicts = 0;
 
     for (const change of changes) {
       if (conflictPaths.has(change.path)) continue;
@@ -229,6 +237,7 @@ export class SyncEngine extends EventEmitter {
       );
 
       if (newConflicts.length > 0) {
+        totalNewConflicts += newConflicts.length;
         await ConflictDetector.saveConflicts(newConflicts);
         newConflicts.forEach(c => this.emit('conflict', c));
         continue;
@@ -264,6 +273,8 @@ export class SyncEngine extends EventEmitter {
     } else {
       await syncStateManager.updateLastSyncTime(Date.now());
     }
+
+    eventLogManager.recordSyncCycleEnd(processedPaths.size, totalNewConflicts);
 
     console.log('[SyncEngine] Sync completed');
     this.emit('syncComplete');
@@ -356,6 +367,14 @@ export class SyncEngine extends EventEmitter {
       record.status = 'success';
       await addSyncRecord(record);
 
+      eventLogManager.recordConflictResolve(
+        conflict.filePath,
+        resolution,
+        'success',
+        record.message,
+        'manual',
+      );
+
       this.emit('conflictResolved', conflict);
       this.emit('statusChange', await this.getStatus());
 
@@ -367,6 +386,15 @@ export class SyncEngine extends EventEmitter {
       record.status = 'failed';
       record.message = error.message;
       await addSyncRecord(record);
+
+      eventLogManager.recordConflictResolve(
+        conflict.filePath,
+        resolution,
+        'failed',
+        error.message,
+        'manual',
+      );
+
       console.error(`[SyncEngine] Failed to resolve conflict:`, error);
       throw error;
     }

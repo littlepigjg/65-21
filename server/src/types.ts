@@ -63,3 +63,64 @@ export interface SyncStatus {
   totalFiles: number;
   recentRecords: SyncRecord[];
 }
+
+export type AuditEventType =
+  | 'file_create'
+  | 'file_modify'
+  | 'file_delete'
+  | 'sync_execute'
+  | 'sync_skip'
+  | 'conflict_detect'
+  | 'conflict_resolve'
+  | 'system_start'
+  | 'system_stop'
+  | 'sync_cycle_start'
+  | 'sync_cycle_end';
+
+export type AuditEventStatus = 'success' | 'failed' | 'pending' | 'skipped' | 'info';
+
+export interface AuditEvent {
+  id: string;
+  timestamp: number;
+  type: AuditEventType;
+  filePath?: string;
+  sourceSide?: 'source' | 'target' | 'both';
+  status: AuditEventStatus;
+  result?: string;
+  details?: Record<string, any>;
+  syncDirection?: 'source-to-target' | 'target-to-source' | 'none';
+  conflictResolution?: 'source' | 'target' | 'merge';
+  fileHash?: string;
+  fileSize?: number;
+  previousHash?: string;
+  operator?: 'system' | 'manual';
+}
+
+export interface EventQueryParams {
+  startTime?: number;
+  endTime?: number;
+  filePath?: string;
+  eventTypes?: AuditEventType[];
+  status?: AuditEventStatus;
+  sourceSide?: 'source' | 'target' | 'both';
+  limit?: number;
+  offset?: number;
+  aggregate?: 'none' | 'hourly' | 'daily' | 'count';
+  sample?: number;
+}
+
+export interface HourlyAggregate {
+  hour: string;
+  timestamp: number;
+  total: number;
+  byType: Record<string, number>;
+  byStatus: Record<string, number>;
+}
+
+export interface EventQueryResult {
+  events: AuditEvent[];
+  total: number;
+  hasMore: boolean;
+  aggregates?: HourlyAggregate[];
+  timeRange?: { start: number; end: number };
+}

@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { ConflictFile, FileState, SyncState } from '../types';
 import { getConfig, addConflict, getConflicts } from '../utils/storage';
+import { eventLogManager } from './EventLogManager';
 
 export class ConflictDetector {
   static detectConflicts(
@@ -25,6 +26,18 @@ export class ConflictDetector {
       const conflict = this.checkConflict(filePath, sourceFile, targetFile, lastKnownState);
       if (conflict) {
         conflicts.push(conflict);
+        eventLogManager.recordConflictDetect(
+          filePath,
+          sourceFile?.hash ?? '',
+          targetFile?.hash ?? '',
+          {
+            sourceMtime: sourceFile?.mtime,
+            targetMtime: targetFile?.mtime,
+            sourceSize: sourceFile?.size,
+            targetSize: targetFile?.size,
+            conflictId: conflict.id,
+          },
+        );
       }
     }
 

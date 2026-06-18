@@ -3,10 +3,11 @@ import Dashboard from './components/Dashboard';
 import ConflictList from './components/ConflictList';
 import ConflictResolver from './components/ConflictResolver';
 import Config from './components/Config';
+import TimelinePlayer from './components/TimelinePlayer';
 import { createEventSource, syncApi } from './api';
 import { SyncStatus } from './types';
 
-type Tab = 'dashboard' | 'conflicts' | 'config';
+type Tab = 'dashboard' | 'conflicts' | 'timeline' | 'config';
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
@@ -82,6 +83,12 @@ function App() {
           ) : null}
         </button>
         <button
+          className={activeTab === 'timeline' ? 'active' : ''}
+          onClick={() => setActiveTab('timeline')}
+        >
+          🎬 历史回放
+        </button>
+        <button
           className={activeTab === 'config' ? 'active' : ''}
           onClick={() => setActiveTab('config')}
         >
@@ -90,6 +97,7 @@ function App() {
       </div>
 
       {activeTab === 'dashboard' && <Dashboard status={status} />}
+      {activeTab === 'timeline' && <TimelinePlayer />}
       {activeTab === 'conflicts' && !selectedConflictId && (
         <ConflictList onResolve={handleResolveConflict} />
       )}

@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { FileState, SyncConfig, SyncRecord } from '../types';
 import { copyFileWithDirs, deleteFileIfExists, writeTextFile, getFileState } from '../utils/file';
 import { addSyncRecord } from '../utils/storage';
+import { eventLogManager } from './EventLogManager';
 
 export type SyncAction = 'copy' | 'delete' | 'update' | 'none';
 export type SyncDirection = 'source-to-target' | 'target-to-source' | 'none';
@@ -126,6 +127,7 @@ export class FileSyncer {
     const decision = this.decideSyncAction(sourceFile, targetFile, lastState, config);
 
     if (decision.action === 'none') {
+      eventLogManager.recordSyncSkip(relativePath, decision.reason, decision.direction);
       return {
         success: true,
         action: 'none',
@@ -179,6 +181,19 @@ export class FileSyncer {
       record.status = 'success';
       await addSyncRecord(record);
 
+      eventLogManager.recordSyncExecute(
+        relativePath,
+        decision.direction,
+        decision.action,
+        'success',
+        decision.reason,
+        {
+          sourceHash: finalSourceState?.hash,
+          targetHash: finalTargetState?.hash,
+          fileSize: finalSourceState?.size ?? finalTargetState?.size,
+        },
+      );
+
       return {
         success: true,
         action: decision.action,
@@ -192,6 +207,14 @@ export class FileSyncer {
       record.status = 'failed';
       record.message = error.message;
       await addSyncRecord(record);
+
+      eventLogManager.recordSyncExecute(
+        relativePath,
+        decision.direction,
+        decision.action,
+        'failed',
+        error.message,
+      );
 
       return {
         success: false,

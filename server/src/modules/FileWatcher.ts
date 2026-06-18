@@ -2,7 +2,8 @@ import chokidar, { FSWatcher } from 'chokidar';
 import path from 'path';
 import { EventEmitter } from 'events';
 import { getConfig } from '../utils/storage';
-import { isIgnored } from '../utils/file';
+import { isIgnored, getFileState } from '../utils/file';
+import { eventLogManager } from './EventLogManager';
 
 export type FileChangeEvent = {
   type: 'add' | 'change' | 'delete';
@@ -88,6 +89,24 @@ export class FileWatcher extends EventEmitter {
       }
 
       if (changeType) {
+        const fullPath = path.join(dir, filePath);
+        void (async () => {
+          try {
+            if (changeType === 'delete') {
+              eventLogManager.recordFileDelete(relativePath, source, undefined);
+            } else {
+              const state = await getFileState(fullPath, dir, source);
+              if (state) {
+                if (changeType === 'add') {
+                  eventLogManager.recordFileCreate(relativePath, source, state.hash, state.size);
+                } else {
+                  eventLogManager.recordFileModify(relativePath, source, state.hash, undefined, state.size);
+                }
+              }
+            }
+          } catch {}
+        })();
+
         this.emit('change', {
           type: changeType,
           path: relativePath,

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { SyncConfig, SyncStatus, SyncRecord, ConflictFile, ConflictDiff } from './types';
+import { SyncConfig, SyncStatus, SyncRecord, ConflictFile, ConflictDiff, EventQueryParams, EventQueryResult, EventTypeOption } from './types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -32,6 +32,29 @@ export const recordsApi = {
     api.get<SyncRecord[]>(`/records${limit ? `?limit=${limit}` : ''}`).then(r => r.data),
   getRecent: (limit?: number) =>
     api.get<SyncRecord[]>(`/records/recent${limit ? `?limit=${limit}` : ''}`).then(r => r.data)
+};
+
+export const eventsApi = {
+  query: (params: EventQueryParams) => {
+    const searchParams = new URLSearchParams();
+    if (params.startTime !== undefined) searchParams.append('startTime', String(params.startTime));
+    if (params.endTime !== undefined) searchParams.append('endTime', String(params.endTime));
+    if (params.filePath) searchParams.append('filePath', params.filePath);
+    if (params.eventTypes && params.eventTypes.length > 0) searchParams.append('eventTypes', params.eventTypes.join(','));
+    if (params.status) searchParams.append('status', params.status);
+    if (params.sourceSide) searchParams.append('sourceSide', params.sourceSide);
+    if (params.limit !== undefined) searchParams.append('limit', String(params.limit));
+    if (params.offset !== undefined) searchParams.append('offset', String(params.offset));
+    if (params.aggregate) searchParams.append('aggregate', params.aggregate);
+    if (params.sample !== undefined) searchParams.append('sample', String(params.sample));
+    return api.get<EventQueryResult>(`/events?${searchParams.toString()}`).then(r => r.data);
+  },
+  getTimeRange: () =>
+    api.get<{ start: number; end: number; total: number }>('/events/time-range').then(r => r.data),
+  getStats: () =>
+    api.get<{ totalEvents: number; datesWithLogs: number; logFiles: number }>('/events/stats').then(r => r.data),
+  getTypes: () =>
+    api.get<EventTypeOption[]>('/events/types').then(r => r.data),
 };
 
 export function createEventSource(): EventSource {
